@@ -6,9 +6,15 @@ project (lnsl)
 #------------------------------------------------------------------------------
 
 set(LN_SOURCES_lnsl
-	src/Main.cpp
 	src/DXDevice.cpp
 	src/DXDevice.h
+	src/Generator.cpp
+	src/Generator.h
+	src/Loader.cpp
+	src/Loader.h
+	src/Main.cpp
+	src/Symbols.cpp
+	src/Symbols.h
 )
 
 set(LN_SOURCES_hlsl2glslfork
@@ -84,6 +90,7 @@ set(LN_SOURCES
 )
 
 set(LN_INCLUDE_DIRECTORIES
+	$ENV{DXSDK_DIR}/Include
 	${PROJECT_SOURCE_DIR}/src/hlsl2glslfork/include
 	${PROJECT_SOURCE_DIR}/src/hlsl2glslfork/hlslang/GLSLCodeGen
 	${PROJECT_SOURCE_DIR}/src/hlsl2glslfork/hlslang/Include

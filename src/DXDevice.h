@@ -1,6 +1,7 @@
 
 #pragma once
 #include <d3d9.h>
+#include <D3DX9Shader.h>
 #include "Common.h"
 
 class DXDevice
@@ -15,6 +16,11 @@ public:
 	IDirect3DDevice9*	        mDxDevice;
 
 public:
+
+	~DXDevice()
+	{
+		finalize();
+	}
 
 	bool initlaize()
 	{
