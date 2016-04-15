@@ -1,0 +1,3 @@
+[submodule "external/Fluorite"]
+	path = external/Fluorite
+	url = https://github.com/lriki/Fluorite.git
