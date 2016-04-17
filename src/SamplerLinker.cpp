@@ -212,6 +212,27 @@ public:
 		return result.GetValue();
 	}
 
+
+	template<typename T>
+	Result<T> DoParser(const Parser<T>& parser)
+	{
+		ParserCursor oldPos = m_currentinEval;	// エラー時の復帰用に覚えておく
+		try
+		{
+			Result<T> result = parser.Call(*this);
+			if (result.IsFailed())
+			{
+				m_currentinEval = oldPos;
+			}
+			return result;
+		}
+		catch (ln::Exception& e)
+		{
+			return Result<T>::Failed(m_currentinEval);
+		}
+		return Result<T>::Failed(m_currentinEval);
+	}
+
 	template<typename T>
 	Result<T> Success(const T& value)
 	{
@@ -271,7 +292,7 @@ public:
 			{
 				list.Add(r.GetValue());
 				ParserManager next(r.GetRemainder());
-				r = internalParser(next);
+				r = next.DoParser(internalParser);
 			}
 			return parser.Success(list);
 		};
@@ -289,6 +310,17 @@ struct Data
 
 Result<Data> Statement(ParserManager& parser)
 {
+	// 本来ならt1とかはTokenを返す関数オブジェクトになるのが良い。
+	// が、それだと
+	//		auto result1 = i1.Parse();
+	//		if (result1.IsFailed()) return result1;
+	//		・・・
+	//		return parser.Success(Data{ t1.GetValue.ToString(), ・・・ });
+	// みたいに書く必要があり非常に冗長。
+	// Sprache は LINQ で呼び出される Where や Select に細工がしてあり、
+	// パーサ失敗は throw 使わなくても表現できるのだが、C++ には LINQ みたいなのが無い。
+	// そうでなければ boost Spirit に手を出すか…
+	// http://sssslide.com/www.slideshare.net/yak1ex/impractical-introduction-ofboostspiritqi-pdf
 	auto t1 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
 	auto t2 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator));
 	auto t3 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
