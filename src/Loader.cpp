@@ -55,10 +55,18 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 	}
 
 	ln::String input((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
-	//ln::FileSystem::WriteAllText("tmp.txt", input);
+	ln::FileSystem::WriteAllText("tmp.txt", input);
 
 	SAFE_RELEASE(pShaderText);
 	SAFE_RELEASE(pErrorMsgs);
+
+
+	ln::parser::CppLexer lex;
+	ln::parser::DiagnosticsItemSet diag;
+	ln::parser::TokenListPtr tokens = lex.Tokenize(input.c_str(), &diag);
+	
+	SamplerLinker	samplerLinker;
+	samplerLinker.Parse(tokens);
 
 	//--------------------------------------------------------------
 	// コンパイルして Effect 作成
@@ -82,8 +90,18 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 	}
 	SAFE_RELEASE(errorBuf);
 
-
-
+	//--------------------------------------------------------------
+	// パラメータ
+	D3DXHANDLE handle;
+	UINT idx = 0;
+	while (true)
+	{
+		handle = m_dxEffect->GetParameter(NULL, idx);
+		if (!handle) break;
+		//mXMLDocument.InsertEndChild(
+		//	_createVariableElement(handle));
+		++idx;
+	}
 
 	SAFE_RELEASE(m_dxEffect);
 }

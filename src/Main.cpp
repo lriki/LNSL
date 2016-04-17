@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 {
 	Loader loader;
 	//loader.Load(argv[1]);
-	loader.Load("C:/Programming/Graphics/lightnote-9f1e9050a066054d19a65880b9f8f388204429f4/Tools/LightNoteTools/HLSL2GLSL/full.fx");
+	loader.Load("D:/Proj/LNSL/src/test/MirrorWater_low.fxm");
 
 #if 0
 	std::string shaderSource;

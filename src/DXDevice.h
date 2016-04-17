@@ -1,7 +1,5 @@
 
 #pragma once
-#include <d3d9.h>
-#include <D3DX9Shader.h>
 #include "Common.h"
 
 class DXDevice
