@@ -82,6 +82,10 @@ void SamplerLinker::analyze( IDirect3DDevice9* device, ID3DXEffect* effect )
 class ParserCursor;
 class ParserManager;
 
+// Result の決まりごと
+//	- 成否 (true/false) を持つ
+//	- 値を持つ (失敗の場合は不正値)
+//	- 次の読み取り位置を持つ (remainder)
 // T はパーサ関数の戻す値
 template<typename T>
 class Result
@@ -208,7 +212,7 @@ public:
 			m_currentinEval = oldPos;
 			LN_THROW(0, ln::InvalidFormatException);
 		}
-		m_currentinEval = m_currentinEval.Advance();
+		m_currentinEval = result.GetRemainder();
 		return result.GetValue();
 	}
 
@@ -226,7 +230,7 @@ public:
 			}
 			else
 			{
-				m_currentinEval = m_currentinEval.Advance();
+				m_currentinEval = result.GetRemainder();
 			}
 			return result;
 		}
@@ -238,15 +242,17 @@ public:
 	}
 
 	template<typename T>
-	Result<T> Success(const T& value)
+	Result<T> Success(const T& value, const ParserCursor& remainder)
 	{
-		return Result<T>::Success(value, m_currentinEval);
+		return Result<T>::Success(value, remainder/*, m_currentinEval*/);
 	}
 	template<typename T>
-	Result<T> Failed()
+	Result<T> Failed(const ParserCursor& remainder)
 	{
-		return Result<T>::Failed(m_currentinEval);
+		return Result<T>::Failed(remainder);
 	}
+
+	const ParserCursor& GetPosition() const { return m_currentinEval; }	// パーサ関数成功後、次の読み取り位置をいくつ進めるかはパーサ関数の役目なので公開する
 
 	const ln::parser::Token& GetCurrentValue() const
 	{
@@ -269,8 +275,8 @@ public:
 		return [type](ParserManager& parser)
 		{
 			if (parser.GetCurrentValue().GetCommonType() == type)
-				return parser.Success(parser.GetCurrentValue());//Result<ln::parser::Token>::Success(parser.GetCurrentValue(), parser.Advance());
-			return parser.Failed<ValueT>();	// TODO: メッセージあるとよい
+				return parser.Success(parser.GetCurrentValue(), parser.GetPosition().Advance());//Result<ln::parser::Token>::Success(parser.GetCurrentValue(), parser.Advance());
+			return parser.Failed<ValueT>(parser.GetPosition());	// TODO: メッセージあるとよい
 		};
 	}
 
@@ -279,8 +285,8 @@ public:
 		return [type, ch](ParserManager& parser)
 		{
 			if (parser.GetCurrentValue().GetCommonType() == type && parser.GetCurrentValue().EqualChar(ch))
-				return parser.Success(parser.GetCurrentValue());
-			return parser.Failed<ValueT>();	// TODO: メッセージあるとよい
+				return parser.Success(parser.GetCurrentValue(), parser.GetPosition().Advance());
+			return parser.Failed<ValueT>(parser.GetPosition());	// TODO: メッセージあるとよい
 		};
 	}
 
@@ -289,8 +295,8 @@ public:
 		return [type, string, len](ParserManager& parser)
 		{
 			if (parser.GetCurrentValue().GetCommonType() == type && parser.GetCurrentValue().EqualString(string, len))
-				return parser.Success(parser.GetCurrentValue());
-			return parser.Failed<ValueT>();	// TODO: メッセージあるとよい
+				return parser.Success(parser.GetCurrentValue(), parser.GetPosition().Advance());
+			return parser.Failed<ValueT>(parser.GetPosition());	// TODO: メッセージあるとよい
 		};
 	}
 
@@ -305,10 +311,10 @@ public:
 			while (r.IsSucceed())
 			{
 				list.Add(r.GetValue());
-				ParserManager next(r.GetRemainder());
-				r = next.DoParser(internalParser);
+				//ParserManager next(r.GetRemainder());
+				r = parser.DoParser(internalParser);
 			}
-			return parser.Success(list);
+			return parser.Success(list, parser.GetPosition());
 		};
 	}
 
@@ -342,7 +348,7 @@ Result<ln::parser::Token> Parser_texture_variable(ParserManager& parser)
 	auto t1 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator, '<'));
 	auto t2 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
 	auto t3 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator, '>'));
-	return parser.Success(t2);
+	return parser.Success(t2, parser.GetPosition());
 }
 
 Result<Data> Statement(ParserManager& parser)
@@ -362,7 +368,7 @@ Result<Data> Statement(ParserManager& parser)
 	auto t2 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator));
 	auto t3 = parser.Eval(ParseLib::Or(ParseLib::Token(ln::parser::CommonTokenType::Identifier), Parser<ln::parser::Token>(Parser_texture_variable)));
 	auto t4 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator));
-	return parser.Success(Data{ t1.ToString(), t3.ToString() });
+	return parser.Success(Data{ t1.ToString(), t3.ToString() }, parser.GetPosition());
 }
 
 void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
