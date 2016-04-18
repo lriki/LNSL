@@ -224,6 +224,10 @@ public:
 			{
 				m_currentinEval = oldPos;
 			}
+			else
+			{
+				m_currentinEval = m_currentinEval.Advance();
+			}
 			return result;
 		}
 		catch (ln::Exception& e)
@@ -270,6 +274,16 @@ public:
 		};
 	}
 
+	static Parser<ValueT> Token(ln::parser::CommonTokenType type, char ch)
+	{
+		return [type, ch](ParserManager& parser)
+		{
+			if (parser.GetCurrentValue().GetCommonType() == type && parser.GetCurrentValue().EqualChar(ch))
+				return parser.Success(parser.GetCurrentValue());
+			return parser.Failed<ValueT>();	// TODO: メッセージあるとよい
+		};
+	}
+
 	static Parser<ValueT> Token(ln::parser::CommonTokenType type, const char* string, int len)
 	{
 		return [type, string, len](ParserManager& parser)
@@ -287,7 +301,7 @@ public:
 		return [internalParser](ParserManager& parser)
 		{
 			ln::Array<T> list;
-			auto r = internalParser(parser);
+			auto r = parser.DoParser(internalParser);
 			while (r.IsSucceed())
 			{
 				list.Add(r.GetValue());
@@ -297,6 +311,21 @@ public:
 			return parser.Success(list);
 		};
 	}
+
+	template<typename T>
+	static Parser<T> Or(const Parser<T>& first, const Parser<T>& second)
+	{
+		return [first, second](ParserManager& parser)
+		{
+			auto fr = parser.DoParser(first);
+			if (fr.IsFailed())
+			{
+				return parser.DoParser(second);
+			}
+			return fr;
+		};
+	}
+
 };
 
 
@@ -307,6 +336,14 @@ struct Data
 	ln::String	left;
 	ln::String	right;
 };
+
+Result<ln::parser::Token> Parser_texture_variable(ParserManager& parser)
+{
+	auto t1 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator, '<'));
+	auto t2 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
+	auto t3 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator, '>'));
+	return parser.Success(t2);
+}
 
 Result<Data> Statement(ParserManager& parser)
 {
@@ -323,14 +360,15 @@ Result<Data> Statement(ParserManager& parser)
 	// http://sssslide.com/www.slideshare.net/yak1ex/impractical-introduction-ofboostspiritqi-pdf
 	auto t1 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
 	auto t2 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator));
-	auto t3 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Identifier));
+	auto t3 = parser.Eval(ParseLib::Or(ParseLib::Token(ln::parser::CommonTokenType::Identifier), Parser<ln::parser::Token>(Parser_texture_variable)));
 	auto t4 = parser.Eval(ParseLib::Token(ln::parser::CommonTokenType::Operator));
 	return parser.Success(Data{ t1.ToString(), t3.ToString() });
 }
 
 void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 {
-	ln::String input = 
+	ln::String input =
+		"Texture=<g_MeshTexture>;"
 		"MinFilter=LINEAR;"
 		"MagFilter=NONE;"
 		"MipFilter=NONE;"
