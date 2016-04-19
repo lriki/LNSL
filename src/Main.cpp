@@ -3,6 +3,7 @@
 //#include "Utils.h"
 #include "DXDevice.h"
 #include "Loader.h"
+#include "Generator.h"
 
 //
 //#include <fstream>
@@ -25,7 +26,9 @@ int main(int argc, char* argv[])
 {
 	Loader loader;
 	//loader.Load(argv[1]);
-	loader.Load("D:/Proj/LNSL/src/test/MirrorWater_low.fxm");
+	loader.Load("C:/Proj/LNSL/src/test/MirrorWater_low.fxm");
+
+	StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
 
 #if 0
 	std::string shaderSource;

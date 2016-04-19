@@ -54,8 +54,9 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 		LN_THROW(0, ln::InvalidFormatException);
 	}
 
-	ln::String input((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
-	ln::FileSystem::WriteAllText("tmp.txt", input);
+	m_preprocessedHLSLCode = StringA((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
+	//ln::String input((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
+	//ln::FileSystem::WriteAllText("tmp.txt", input);
 
 	SAFE_RELEASE(pShaderText);
 	SAFE_RELEASE(pErrorMsgs);
@@ -63,7 +64,7 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 
 	ln::parser::CppLexer lex;
 	ln::parser::DiagnosticsItemSet diag;
-	ln::parser::TokenListPtr tokens = lex.Tokenize(input.c_str(), &diag);
+	ln::parser::TokenListPtr tokens = lex.Tokenize(m_preprocessedHLSLCode.c_str(), &diag);
 	
 	SamplerLinker	samplerLinker;
 	samplerLinker.Parse(tokens);
@@ -73,8 +74,8 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 	ID3DXBuffer* errorBuf = NULL;
 	hr = ::D3DXCreateEffect(
 		dxDevice.getDxDevice(),
-		input.c_str(),
-		input.GetLength(),
+		m_preprocessedHLSLCode.c_str(),
+		m_preprocessedHLSLCode.GetLength(),
 		NULL,
 		NULL,
 		D3DXSHADER_ENABLE_BACKWARDS_COMPATIBILITY,

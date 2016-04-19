@@ -13,6 +13,8 @@ set(LN_SOURCES_lnsl
 	src/Loader.cpp
 	src/Loader.h
 	src/Main.cpp
+	src/Parsers.cpp
+	src/Parsers.h
 	src/Symbols.cpp
 	src/Symbols.h
 )
