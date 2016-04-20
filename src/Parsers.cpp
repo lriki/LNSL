@@ -150,8 +150,13 @@ void SamplerLinker::analyze( IDirect3DDevice9* device, ID3DXEffect* effect )
 #define LN_PARSE(result, parser) \
 	auto result##_ = (parser).Call(input); \
 	if (result##_.IsFailed()) return Fail(input); \
-	auto result = result##_.GetValue(); \
-	input = result##_.GetRemainder();
+	input = result##_.GetRemainder(); \
+	auto result = result##_.GetValue();
+
+#define LN_PARSE_RESULT(result, parser) \
+	auto result = (parser).Call(input); \
+	if (result.IsFailed()) return Fail(input); \
+	input = result.GetRemainder();
 
 #define LN_PARSE_SUCCESS(value)	\
 	Success(value, input);
@@ -159,16 +164,18 @@ void SamplerLinker::analyze( IDirect3DDevice9* device, ID3DXEffect* effect )
 namespace combinators
 {
 
+namespace detail
+{
+
 template<typename TCursor>
-class ParserFailure	// TODO: internal
+class ParserFailure
 {
 public:
 	TCursor remainder;
 };
 
-//class ParserSuccess
-//{
-//};
+} // namespace detail
+
 
 // ParserResult の決まりごと
 //	- 成否 (true/false) を持つ
@@ -194,7 +201,7 @@ public:
 	bool IsFailed() const { return !m_isSuccess; }
 
 
-	GenericParserResult(const ParserFailure<TCursor>& failer)	// TODO: move
+	GenericParserResult(const detail::ParserFailure<TCursor>& failer)
 		: m_value()
 		, m_remainder(failer.remainder)
 		, m_isSuccess(false)
@@ -262,6 +269,22 @@ public:
 		return m_tokenList->GetAt(m_position);
 	}
 
+	int GetPosition() const
+	{
+		return m_position;
+	}
+
+	ParserCursor Cuing() const
+	{
+		TConditional cond;
+		int pos = m_position;
+		while (!cond(m_tokenList->GetAt(pos)))
+		{
+			++pos;
+		};
+		return ParserCursor(m_tokenList, pos);
+	}
+
 	ParserCursor Advance() const
 	{
 		if (m_position == m_tokenList->GetCount())
@@ -274,7 +297,7 @@ public:
 		do
 		{
 			++pos;
-		} while (!cond(m_tokenList->GetAt(pos)));
+		} while (pos < m_tokenList->GetCount() && !cond(m_tokenList->GetAt(pos)));
 
 		return ParserCursor(m_tokenList, pos);
 
@@ -288,48 +311,15 @@ private:
 
 
 template<typename TValue, typename TCursor>
-class Parser : public ln::Delegate<GenericParserResult<TValue, TCursor>(TCursor input)>
+class GenericParser : public ln::Delegate<GenericParserResult<TValue, TCursor>(TCursor input)>
 {
 public:
 	template<typename TParserFunc>
-	Parser(TParserFunc func)
+	GenericParser(TParserFunc func)
 		: ln::Delegate<GenericParserResult<TValue, TCursor>(TCursor input)>(func)
 	{
 	}
 };
-
-//// 現在位置と実行関数(ユーティリティ)
-//template<typename TCursor = ParserCursor>
-//class ParserContext
-//{
-//public:
-//
-//	ParserContext() {}
-//	ParserContext(const TCursor& pos) : m_currentinEval(pos) {}
-//
-//	template<typename T>
-//	ParserResult<T, TCursor> TryParse(const Parser<T, TCursor>& parser, const ln::parser::TokenList* tokenList)
-//	{
-//		m_currentinEval = TCursor(tokenList);
-//		ParserResult<T, TCursor> result = parser.Call(m_currentinEval);
-//		if (result.IsFailed())
-//			LN_THROW(0, ln::InvalidFormatException);
-//		return result;
-//	}
-//
-//	const TCursor& GetPosition() const { return m_currentinEval; }	// パーサ関数成功後、次の読み取り位置をいくつ進めるかはパーサ関数の役目なので公開する
-//
-//	const ln::parser::Token& GetCurrentValue() const
-//	{
-//		return m_currentinEval.GetCurrentValue();
-//	}
-//
-//private:
-//	TCursor	m_currentinEval;
-//};
-
-
-
 
 template<typename TParserCursor>
 class ParseLib
@@ -338,7 +328,7 @@ public:
 	using ValueT = ln::parser::Token;
 
 	template<typename TValue>
-	using Parser = ::combinators::Parser<TValue, TParserCursor>;
+	using Parser = GenericParser<TValue, TParserCursor>;
 
 	template<typename TValue>
 	using ParserResult = GenericParserResult<TValue, TParserCursor>;
@@ -351,11 +341,21 @@ public:
 		return ParserResult<T>::Success(value, input);
 	}
 
-	static ParserFailure<TParserCursor> Fail(const TParserCursor& input)
+	static detail::ParserFailure<TParserCursor> Fail(const TParserCursor& input)
 	{
-		ParserFailure<TParserCursor> failer;
+		detail::ParserFailure<TParserCursor> failer;
 		failer.remainder = input;
 		return failer;
+	}
+
+	static Parser<ValueT> Token(char ch)
+	{
+		return [ch](TParserCursor input)
+		{
+			if (input.GetCurrentValue().EqualChar(ch))
+				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.Advance());
+			return ParserResult<ValueT>::Failed(input);	// TODO: メッセージあるとよい
+		};
 	}
 
 	static Parser<ValueT> Token(ln::parser::CommonTokenType type)
@@ -429,7 +429,7 @@ public:
 	static ParserResult<T> TryParse(const Parser<T>& parser, const ln::parser::TokenList* tokenList)
 	{
 		TParserCursor input(tokenList);
-		ParserResult<T> result = parser.Call(input);
+		ParserResult<T> result = parser.Call(input.Cuing());
 		if (result.IsFailed())
 			LN_THROW(0, ln::InvalidFormatException);
 		return result;
@@ -453,11 +453,6 @@ using ParserCursor_SkipSpace = combinators::ParserCursor<ParserCursorCondition_S
 class TokenParser : public combinators::ParseLib<ParserCursor_SkipSpace>
 {
 public:
-
-	//using ParserContext = ::ParserContext<ParserCursor_SkipSpace>;
-
-	//template<typename TValue>
-	//using Result = ::combinators::ParserResult<TValue, ParserCursor_SkipSpace>;
 
 	struct Data
 	{
@@ -484,12 +479,98 @@ public:
 		LN_PARSE(t4, Token(ln::parser::CommonTokenType::Operator));
 		return LN_PARSE_SUCCESS(Data(t1.ToString(), t3.ToString()));
 	}
-
-
 };
+
+
+
+
+
+
+
+namespace ParameterAnnotationParser
+{
+	struct Range
+	{
+		int start;
+		int last;
+	};
+
+	struct ParserCursorCondition_SkipSpace
+	{
+		bool operator()(const parser::Token& token)
+		{
+			return token.EqualChar('<') || token.EqualChar('>') || token.EqualChar('{') || token.EqualChar('}');
+		}
+	};
+
+	using ParserCursor_SkipSpace = combinators::ParserCursor<ParserCursorCondition_SkipSpace>;
+
+
+	struct TokenParser : public combinators::ParseLib<ParserCursor_SkipSpace>
+	{
+		static ParserResult<Range> Parse_GlobalAnnotation(ParserCursor input)
+		{
+			LN_PARSE_RESULT(r1, Token('<'));
+			LN_PARSE_RESULT(r2, Token('>'));
+			Range r{ input.GetPosition(), r1.GetRemainder().GetPosition() };	// TODO: やっぱり input は runner とかにして、開始点もほしい。あと、マクロ内に {} 初期化子は書けないので、LN_PARSE_SUCCESS はやめて runner.Success() で返したい
+			return LN_PARSE_SUCCESS(r);
+		}
+
+		static ParserResult<Range> Parse_Block(ParserCursor input)
+		{
+			LN_PARSE_RESULT(r1, Token('{'));
+			LN_PARSE_RESULT(r3, Many<Range>(Parse_Block));	// ネスト	TODO: できれば <Range> はやめたい
+			LN_PARSE_RESULT(r2, Token('}'));
+			Range r{ input.GetPosition(), r1.GetRemainder().GetPosition() };	// TODO: やっぱり input は runner とかにして、開始点もほしい。あと、マクロ内に {} 初期化子は書けないので、LN_PARSE_SUCCESS はやめて runner.Success() で返したい
+			return LN_PARSE_SUCCESS(r);
+		}
+
+		static ParserResult<Array<Range>> Parse_File(ParserCursor input)
+		{
+			LN_PARSE(r1, Parser<Range>(Parse_GlobalAnnotation));
+			LN_PARSE(r3, Parser<Range>(Parse_Block));
+			Array<Range> list{ r1, r3 };
+			return LN_PARSE_SUCCESS(list);
+		}
+	};
+};
+
+
+
+
+
 
 void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 {
+	{
+
+		String input =
+			"aa<aa>;"
+			"f"
+			"{"
+			"  {"
+			"  }"
+			"}";
+
+
+		ln::parser::CppLexer lex;
+		ln::parser::DiagnosticsItemSet diag;
+		ln::parser::TokenListPtr tokens = lex.Tokenize(input.c_str(), &diag);
+
+
+		auto result = ParameterAnnotationParser::TokenParser::TryParse(
+			ParameterAnnotationParser::TokenParser::Parser<Array<ParameterAnnotationParser::Range>>(ParameterAnnotationParser::TokenParser::Parse_File), tokens);
+
+		printf("");
+
+	}
+
+
+
+
+
+
+
 	ln::String input =
 		"Texture = <g_MeshTexture>;"
 		"MinFilter=LINEAR;"
