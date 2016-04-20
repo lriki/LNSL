@@ -236,35 +236,35 @@ struct ParserCursorConditional
 };
 
 template<typename TConditional = ParserCursorConditional::Always>
-class ParserCursor
+class GenericParserCursor
 {
 public:
-	ParserCursor()
+	GenericParserCursor()
 		: m_tokenList(nullptr)
 		, m_position(0)
 	{}
 
 	// パース開始時の初期化用
-	ParserCursor(const ln::parser::TokenList* tokenList)
+	GenericParserCursor(const ln::parser::TokenList* tokenList)
 		: m_tokenList(tokenList)
 		, m_position(0)
 	{
 	}
 
 	// パース開始時の初期化用
-	ParserCursor(const ln::parser::TokenList* tokenList, int position)
+	GenericParserCursor(const ln::parser::TokenList* tokenList, int position)
 		: m_tokenList(tokenList)
 		, m_position(position)
 	{
 	}
 
-	ParserCursor(const ParserCursor& obj)
+	GenericParserCursor(const GenericParserCursor& obj)
 		: m_tokenList(obj.m_tokenList)
 		, m_position(obj.m_position)
 	{
 	}
 
-	ParserCursor& operator=(const ParserCursor& obj)
+	GenericParserCursor& operator=(const GenericParserCursor& obj)
 	{
 		m_tokenList = obj.m_tokenList;
 		m_position = obj.m_position;
@@ -281,7 +281,7 @@ public:
 		return m_position;
 	}
 
-	ParserCursor Cuing() const
+	GenericParserCursor Cuing() const
 	{
 		TConditional cond;
 		int pos = m_position;
@@ -289,10 +289,10 @@ public:
 		{
 			++pos;
 		};
-		return ParserCursor(m_tokenList, pos);
+		return GenericParserCursor(m_tokenList, pos);
 	}
 
-	ParserCursor Advance() const
+	GenericParserCursor Advance() const
 	{
 		if (m_position == m_tokenList->GetCount())
 		{
@@ -306,9 +306,7 @@ public:
 			++pos;
 		} while (pos < m_tokenList->GetCount() && !cond(m_tokenList->GetAt(pos)));
 
-		return ParserCursor(m_tokenList, pos);
-
-		//return ParserCursor(m_tokenList, m_position + 1);
+		return GenericParserCursor(m_tokenList, pos);
 	}
 
 private:
@@ -327,6 +325,12 @@ public:
 	{
 	}
 
+	GenericParserContext(const GenericParserContext& obj)
+		: m_start(obj.m_current)
+		, m_current(obj.m_current)
+	{
+	}
+
 	TCursor GetNext() const
 	{
 		return m_current.Advance();
@@ -339,7 +343,7 @@ public:
 		return m_current.GetCurrentValue();
 	}
 
-	const TCursor& GetStartursor() const
+	const TCursor& GetStartCursor() const
 	{
 		return m_start;
 	}
@@ -503,7 +507,7 @@ struct ParserCursorCondition_SkipSpace
 	}
 };
 
-using ParserCursor_SkipSpace = combinators::ParserCursor<ParserCursorCondition_SkipSpace>;
+using ParserCursor_SkipSpace = combinators::GenericParserCursor<ParserCursorCondition_SkipSpace>;
 
 
 class TokenParser : public combinators::ParseLib<ParserCursor_SkipSpace>
@@ -514,9 +518,6 @@ public:
 	{
 		String	left;
 		String	right;
-
-		Data() {}
-		Data(String l, String r) : left(l), right(r) {}
 	};
 
 	static ParserResult<ln::parser::Token> Parse_texture_variable(ParserContext input)
@@ -533,15 +534,13 @@ public:
 		LN_PARSE(t2, Token(ln::parser::CommonTokenType::Operator));
 		LN_PARSE(t3, Or(ParseLib::Token(ln::parser::CommonTokenType::Identifier), Parse_texture_variable));
 		LN_PARSE(t4, Token(ln::parser::CommonTokenType::Operator));
-		return input.Success(Data(t1.ToString(), t3.ToString()));
+		return input.Success(Data{ t1.ToString(), t3.ToString() });
 	}
 };
 
 
 
 
-
-#if 0
 
 namespace ParameterAnnotationParser
 {
@@ -559,26 +558,24 @@ namespace ParameterAnnotationParser
 		}
 	};
 
-	using ParserCursor_SkipSpace = combinators::ParserCursor<ParserCursorCondition_SkipSpace>;
+	using ParserCursor_SkipSpace = combinators::GenericParserCursor<ParserCursorCondition_SkipSpace>;
 
 
 	struct TokenParser : public combinators::ParseLib<ParserCursor_SkipSpace>
 	{
 		static ParserResult<Range> Parse_GlobalAnnotation(ParserContext input)
 		{
-			LN_PARSE_RESULT(r1, Token('<'));
-			LN_PARSE_RESULT(r2, Token('>'));
-			Range r{ input.GetPosition(), r1.GetRemainder().GetPosition() };	// TODO: やっぱり input は runner とかにして、開始点もほしい。あと、マクロ内に {} 初期化子は書けないので、LN_PARSE_SUCCESS はやめて runner.Success() で返したい
-			return LN_PARSE_SUCCESS(r);
+			LN_PARSE_RESULT(r1, TokenChar('<'));
+			LN_PARSE_RESULT(r2, TokenChar('>'));
+			return input.Success(Range{ input.GetStartCursor().GetPosition(), r1.GetRemainder().GetPosition() });
 		}
 
 		static ParserResult<Range> Parse_Block(ParserContext input)
 		{
-			LN_PARSE_RESULT(r1, Token('{'));
-			LN_PARSE_RESULT(r3, Many<Range>(Parse_Block));	// ネスト	TODO: できれば <Range> はやめたい
-			LN_PARSE_RESULT(r2, Token('}'));
-			Range r{ input.GetPosition(), r1.GetRemainder().GetPosition() };	// TODO: やっぱり input は runner とかにして、開始点もほしい。あと、マクロ内に {} 初期化子は書けないので、LN_PARSE_SUCCESS はやめて runner.Success() で返したい
-			return LN_PARSE_SUCCESS(r);
+			LN_PARSE_RESULT(r1, TokenChar('{'));
+			LN_PARSE_RESULT(r2, Many<Range>(Parse_Block));	// ネスト	TODO: できれば <Range> はやめたい
+			LN_PARSE_RESULT(r3, TokenChar('}'));
+			return input.Success(Range{ input.GetStartCursor().GetPosition(), r2.GetRemainder().GetPosition() });
 		}
 
 		static ParserResult<Array<Range>> Parse_File(ParserContext input)
@@ -586,11 +583,10 @@ namespace ParameterAnnotationParser
 			LN_PARSE(r1, Parser<Range>(Parse_GlobalAnnotation));
 			LN_PARSE(r3, Parser<Range>(Parse_Block));
 			Array<Range> list{ r1, r3 };
-			return LN_PARSE_SUCCESS(list);
+			return input.Success(list);
 		}
 	};
 };
-#endif
 
 
 
@@ -598,16 +594,21 @@ namespace ParameterAnnotationParser
 
 void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 {
-#if 0
 	{
 
 		String input =
-			"aa<aa>;"
+			"aa"
+			"<"
+			"aa"
+			">"
+			";"
 			"f"
 			"{"
-			"  {"
-			"  }"
-			"}";
+			"{"
+			"}"
+			";"
+			"}"
+			";";
 
 
 		ln::parser::CppLexer lex;
@@ -621,7 +622,6 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 		printf("");
 
 	}
-#endif
 
 
 
