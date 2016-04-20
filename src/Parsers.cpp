@@ -327,10 +327,11 @@ public:
 	{
 	}
 
-	const TCursor& Advance()
+	TCursor GetNext() const
 	{
-		m_current = m_current.Advance();
-		return m_current;
+		return m_current.Advance();
+		//m_current = m_current.Advance();
+		//return m_current;
 	}
 
 	const parser::Token& GetCurrentValue() const
@@ -408,7 +409,7 @@ public:
 		return [ch](ParserContext input)
 		{
 			if (input.GetCurrentValue().EqualChar(ch))
-				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.Advance());
+				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.GetNext());
 			return ParserResult<ValueT>::Failed(input.GetCurrentCursor());	// TODO: メッセージあるとよい
 		};
 	}
@@ -418,7 +419,7 @@ public:
 		return [type](ParserContext input)
 		{
 			if (input.GetCurrentValue().GetCommonType() == type)
-				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.Advance());
+				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.GetNext());
 			return ParserResult<ValueT>::Failed(input.GetCurrentCursor());	// TODO: メッセージあるとよい
 		};
 	}
@@ -428,7 +429,7 @@ public:
 		return [type, ch](ParserContext input)
 		{
 			if (input.GetCurrentValue().GetCommonType() == type && input.GetCurrentValue().EqualChar(ch))
-				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.Advance());
+				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.GetNext());
 			return ParserResult<ValueT>::Failed(input.GetCurrentCursor());
 		};
 	}
@@ -438,7 +439,7 @@ public:
 		return [type, string, len](ParserContext input)
 		{
 			if (input.GetCurrentValue().GetCommonType() == type && input.GetCurrentValue().EqualString(string, len))
-				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.Advance());
+				return ParserResult<ValueT>::Success(input.GetCurrentValue(), input.GetNext());
 			return ParserResult<ValueT>::Failed(input.GetCurrentCursor());
 		};
 	}
