@@ -656,10 +656,20 @@ namespace ParameterAnnotationParser
 	struct Range
 	{
 		RangeType		type;
-		int				headerStart;
+		int				headerBegin;
 		int				begin;
 		int				end;
 		Array<Range>	childRanges;
+
+		template<typename TFunc>
+		void ForEach(TFunc func)
+		{
+			func(*this);
+			for (auto& r : childRanges)
+			{
+				r.ForEach(func);
+			}
+		}
 	};
 
 	struct ParserCursorCondition_SkipSpace
@@ -668,7 +678,9 @@ namespace ParameterAnnotationParser
 		{
 			return
 				token.EqualChar('<') || token.EqualChar('>') || token.EqualChar('{') || token.EqualChar('}') ||
-				token.EqualString("sampler_state", 13) || token.EqualString("technique", 9) ||
+				token.EqualString("sampler_state", 13) ||
+				token.EqualString("technique", 9) ||
+				token.EqualString("pass", 4) ||
 				token.IsEof();	// TODO: これが無くてもいいようにしたい。今はこれがないと、Many中にEOFしたときOutOfRangeする
 		}
 	};
@@ -698,9 +710,19 @@ namespace ParameterAnnotationParser
 			LN_PARSE_RESULT(r1, TokenString("technique"));
 			LN_PARSE_RESULT(r2, Optional(Parser<Range>(Parse_Annotation)));
 			LN_PARSE_RESULT(r3, TokenChar('{'));
-			LN_PARSE_RESULT(r4, Many<Range>(Parser<Range>(Parse_Block)));	// ネスト	TODO: できれば <Range> はやめたい
+			LN_PARSE_RESULT(r4, Many<Range>(Parser<Range>(Parse_pass_block)));	// ネスト	TODO: できれば <Range> はやめたい
 			LN_PARSE_RESULT(r5, TokenChar('}'));
-			return input.Success(Range{ RangeType::TechniqueBlock, r1.GetMatchBegin(), r1.GetMatchBegin(), r5.GetMatchEnd(), Array<Range>() });
+			return input.Success(Range{ RangeType::TechniqueBlock, r1.GetMatchBegin(), r1.GetMatchBegin(), r5.GetMatchEnd(), r4.GetValue() });
+		}
+
+		static ParserResult<Range> Parse_pass_block(ParserContext input)
+		{
+			LN_PARSE_RESULT(r1, TokenString("pass"));
+			LN_PARSE_RESULT(r2, Optional(Parser<Range>(Parse_Annotation)));
+			LN_PARSE_RESULT(r3, TokenChar('{'));
+			// この中に < > は無いはず
+			LN_PARSE_RESULT(r5, TokenChar('}'));
+			return input.Success(Range{ RangeType::PassBlock, r1.GetMatchBegin(), r1.GetMatchBegin(), r5.GetMatchEnd(), Array<Range>() });
 		}
 
 		static ParserResult<Range> Parse_Block(ParserContext input)
@@ -736,76 +758,32 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 	
 	{
 		StreamWriter w("test2.txt");
+
+
 		auto list = result.GetValue();
 		for (auto& r : list)
 		{
-			w.WriteLine("----");
-			w.WriteLine(tokenList->ToString(r.begin, r.end));
-			w.WriteLine("----");
+			r.ForEach([&w, tokenList](const ParameterAnnotationParser::Range& r)
+			{
+				if (r.type == ParameterAnnotationParser::RangeType::PassBlock)
+				{
+					w.WriteLine("--- pass ----");
+					w.WriteLine(tokenList->ToString(r.begin, r.end));
+					w.WriteLine("-------------");
+
+				}
+			});
+			
+
+			//w.WriteLine("----");
+			//w.WriteLine(tokenList->ToString(r.begin, r.end));
+			//w.WriteLine("----");
 		}
 	}
 
 
 	printf("");
 
-#if 0
-	{
-
-		String input =
-			"aa"
-			"<"
-			"aa"
-			">"
-			";"
-			"f"
-			"{"
-			"{"
-			"}"
-			";"
-			"}"
-			";";
-
-
-		ln::parser::CppLexer lex;
-		ln::parser::DiagnosticsItemSet diag;
-		ln::parser::TokenListPtr tokens = lex.Tokenize(input.c_str(), &diag);
-
-
-		auto result = ParameterAnnotationParser::TokenParser::TryParse(
-			ParameterAnnotationParser::TokenParser::Parser<Array<ParameterAnnotationParser::Range>>(ParameterAnnotationParser::TokenParser::Parse_File), tokens);
-
-		printf("");
-
-	}
-
-
-
-
-
-
-	ln::String input =
-		"Texture = <g_MeshTexture>;"
-		"MinFilter=LINEAR;"
-		"MagFilter=NONE;"
-		"MipFilter=NONE;"
-		"AddressU=WRAP;"
-		"AddressV=WRAP;";
-
-	ln::parser::CppLexer lex;
-	ln::parser::DiagnosticsItemSet diag;
-	ln::parser::TokenListPtr tokens = lex.Tokenize(input.c_str(), &diag);
-
-	//auto left = ParseLib::Token(ln::parser::CommonTokenType::Identifier, "MinFilter", 9);
-	//auto stmt = Parser<TokenParser::Data>(TokenParser::Statement);
-
-	auto manyStmt = TokenParser::Many<TokenParser::Data>(TokenParser::Statement);
-	auto result = TokenParser::TryParse(manyStmt, tokens);
-
-	//
-	//auto result = stmt.TryParse(tokens);
-
-	printf("");
-#endif
 }
 
 
