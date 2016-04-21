@@ -9,7 +9,7 @@ public:
 	Loader();
 	~Loader();
 
-	void Load(const ln::PathName& hlslFilePath);
+	void Load(Effect* effect, const ln::PathName& hlslFilePath);
 
 	const StringA& GetPreprocessedHLSLCode() const { return m_preprocessedHLSLCode; }
 

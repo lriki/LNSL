@@ -24,11 +24,16 @@ http://msdn.microsoft.com/ja-jp/library/bb509615%28v=vs.85%29.aspx
 
 int main(int argc, char* argv[])
 {
+	Effect effect;
+
 	Loader loader;
 	//loader.Load(argv[1]);
-	loader.Load("C:/Proj/LNSL/src/test/MirrorWater_low.fxm");
+	loader.Load(&effect, "D:/Proj/LNSL/src/test/MirrorWater_low.fxm");
 
-	StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
+	Generator gen;
+	gen.Generate(&effect, "D:/Proj/LNSL/src/test/MirrorWater_low.fxc");
+
+	//StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
 
 #if 0
 	std::string shaderSource;

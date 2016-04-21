@@ -3,84 +3,14 @@
 #include "Common.h"
 #include "Parsers.h"
 
+SamplerLinker::SamplerLinker(Effect* effect)
+	: m_effect(effect)
+{
+}
+
 SamplerLinker::~SamplerLinker()
 {
-	for( TextureVar& var : mTextureVarArray )
-	{
-		SAFE_RELEASE( var.Texture );
-	}
 }
-
-//---------------------------------------------------------------------
-//
-//---------------------------------------------------------------------
-void SamplerLinker::analyze( IDirect3DDevice9* device, ID3DXEffect* effect )
-{
-	mDxDevice = device;
-	mDxEffect = effect;
-
-	// まずはテクスチャ型変数にダミーテクスチャを作って設定
-    for ( UINT i = 0; ; ++i )
-    {
-        D3DXHANDLE handle = mDxEffect->GetParameter( NULL, i );
-        if ( !handle ) break;
-
-		D3DXPARAMETER_DESC desc;
-		mDxEffect->GetParameterDesc( handle, &desc );
-
-		switch ( desc.Type )
-		{
-			case D3DXPT_TEXTURE:
-			case D3DXPT_TEXTURE1D:
-			case D3DXPT_TEXTURE2D:
-			case D3DXPT_TEXTURE3D:
-			case D3DXPT_TEXTURECUBE:
-			{
-				TextureVar texVer;
-				texVer.Name = desc.Name;
-				IDirect3DTexture9* dxtex;
-				HRESULT hr = mDxDevice->CreateTexture( 32, 32, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &dxtex, NULL );
-				texVer.Texture = dxtex;
-				if ( FAILED( hr ) ) {
-					printf( "failed create dummy texture." );
-				}
-				mTextureVarArray.push_back( texVer );
-				mDxEffect->SetTexture( handle, texVer.Texture );
-				break;
-			}
-			default:
-				break;
-		}
-	}
-
-	// サンプラ型変数ごとに解析
-    for ( UINT i = 0; ; ++i )
-    {
-        D3DXHANDLE handle = mDxEffect->GetParameter( NULL, i );
-        if ( !handle ) break;
-
-		D3DXPARAMETER_DESC desc;
-		mDxEffect->GetParameterDesc( handle, &desc );
-
-		switch ( desc.Type )
-		{
-			case D3DXPT_SAMPLER:
-			case D3DXPT_SAMPLER1D:
-			case D3DXPT_SAMPLER2D:
-			case D3DXPT_SAMPLER3D:
-			case D3DXPT_SAMPLERCUBE:
-				analyzeSampler( handle, desc.Name );
-				break;
-			default:
-				break;
-		}
-	}
-}
-
-
-
-
-
 
 /*
 	一番シンプル
@@ -746,7 +676,7 @@ namespace ParameterAnnotationParser
 
 
 
-void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
+String SamplerLinker::Parse(ln::parser::TokenListPtr& tokenList)
 {
 	auto result = ParameterAnnotationParser::TokenParser::TryParse(
 		ParameterAnnotationParser::TokenParser::Parser<Array<ParameterAnnotationParser::Range>>(ParameterAnnotationParser::TokenParser::Parse_File), tokenList);
@@ -766,20 +696,64 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 			r.ForEach([this, /*&w, */tokenList](const ParameterAnnotationParser::Range& r)
 			{
 
+				if (r.type == ParameterAnnotationParser::RangeType::SamplerStateBlock)
+				{
+					SamplerInfo info;
+					info.samplerName = tokenList->GetAt(r.headerBegin - 4).ToString();	// 巻き戻して読むと名前
+
+					// サンプラステートの読み取り
+					String statusText = tokenList->ToString(r.begin + 1, r.end - 1);
+					StringArray lines = statusText.Split(_T(";"), StringSplitOptions::RemoveEmptyEntries);
+					for (String line : lines)
+					{
+						StringArray tokens = line.Split(_T("="), StringSplitOptions::RemoveEmptyEntries);
+						if (tokens.GetCount() >= 2)
+						{
+							String l = tokens[0].Trim();
+							String r = tokens[1].Trim();
+							if (l == "texture")
+							{
+								info.textureName = r;
+							}
+							else
+							{
+								info.samplerStatus[l] = r;
+							}
+						}
+					}
+
+					m_effect->m_samplerInfoList.Add(info);
+				}
+				else if (r.type == ParameterAnnotationParser::RangeType::Annotation)
+				{
+					// Annotation の範囲を全て無効コードにする
+					for (int i = r.begin; i < r.end; ++i)
+					{
+						parser::TokenList* tl = tokenList;
+						tl->GetAt(i).SetValid(false);
+					}
+				}
 				if (r.type == ParameterAnnotationParser::RangeType::TechniqueBlock)
 				{
 					TechniqueInfo info;
 					info.name = tokenList->GetAt(r.headerBegin + 2).ToString();	// スペースを飛ばして読むと名前
-					m_techniqueInfoList.Add(info);
+					m_effect->m_techniqueInfoList.Add(info);
 					//w.WriteLine("Technique {0}", info.name);
+
+					// technique の範囲を全て無効コードにする
+					for (int i = r.headerBegin; i < r.end; ++i)
+					{
+						parser::TokenList* tl = tokenList;
+						tl->GetAt(i).SetValid(false);
+					}
 				}
 				if (r.type == ParameterAnnotationParser::RangeType::PassBlock)
 				{
 					PassInfo info;
 					info.name = tokenList->GetAt(r.headerBegin + 2).ToString();	// スペースを飛ばして読むと名前
-					m_techniqueInfoList.GetLast().passes.Add(info);
 					//w.WriteLine("  Pass {0}", info.name);
 
+					// レンダーステートの読み取り
 					String statusText = tokenList->ToString(r.begin + 1, r.end - 1);
 					StringArray lines = statusText.Split(_T(";"), StringSplitOptions::RemoveEmptyEntries);
 					for (String line : lines)
@@ -795,12 +769,32 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 								parser::DiagnosticsItemSet diag;
 								parser::TokenListPtr valueTokens = lex.Tokenize(si.value.c_str(), &diag);	// TODO: 範囲
 								LN_THROW(!diag.HasError(), InvalidFormatException);
-								si.value = valueTokens->GetAt(4).ToString();
+
+								if (si.name == "VertexShader")
+								{
+									info.vertexShader = valueTokens->GetAt(4).ToString();
+								}
+								else if (si.name == "PixelShader")
+								{
+									info.pixelShader = valueTokens->GetAt(4).ToString();
+								}
+							}
+							else
+							{
+								info.status.Add(si);
 							}
 
-							info.status.Add(si);
 							//w.WriteLine("    {0}={1}", si.name, si.value);
 						}
+					}
+
+					m_effect->m_techniqueInfoList.GetLast().passes.Add(info);
+
+					// pass の範囲を全て無効コードにする
+					for (int i = r.headerBegin; i < r.end; ++i)
+					{
+						parser::TokenList* tl = tokenList;
+						tl->GetAt(i).SetValid(false);
 					}
 				}
 			});
@@ -813,129 +807,9 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 	}
 
 
-	printf("");
-
-}
-
-
-
-//---------------------------------------------------------------------
-//
-//---------------------------------------------------------------------
-void SamplerLinker::analyzeSampler( D3DXHANDLE handle, const char* name )
-{
-	printf("▼ %s の検索 ----------------\n", name);
-	// TODO 重複の排除
-
-	for ( UINT iTech = 0; ; ++iTech )
-	{
-		D3DXHANDLE tech = mDxEffect->GetTechnique( iTech );
-		if ( tech ) 
-		{
-			mDxEffect->SetTechnique( tech );
-			UINT passes = 0;
-			mDxEffect->Begin( &passes, 0 );
-			for ( UINT iPass = 0; iPass < passes; ++iPass )
-			{
-				mDxEffect->BeginPass( iPass );
-
-				//printf("pass %d ----\n", iPass);
-
-				IDirect3DPixelShader9* ps = NULL;
-				mDxDevice->GetPixelShader( &ps );
-				if ( ps )
-				{
-					UINT size;
-					ps->GetFunction( NULL, &size );
-
-					ln::byte_t* funcBuf = new ln::byte_t[size];
-					ps->GetFunction( funcBuf, &size );
-
-					ID3DXConstantTable* ct;
-					D3DXGetShaderConstantTable( (const DWORD*)funcBuf, &ct );
-
-					D3DXHANDLE sampler = ct->GetConstantByName( NULL, name );
-					if ( sampler )
-					{
-						UINT index = ct->GetSamplerIndex( sampler );
-
-						// サンプラの index にセットされているテクスチャ
-						IDirect3DBaseTexture9* basetex;
-						mDxDevice->GetTexture( index, &basetex );
-							
-						if ( basetex )
-						{
-							IDirect3DBaseTexture9* tex = basetex;//dynamic_cast<IDirect3DTexture9*>( basetex );
-							if ( tex )
-							{
-								TextureVar* var = findTextureVar( tex );
-								if ( var )
-								{
-									SamplerPair pair;
-									pair.SamplerVarName = name;
-									pair.TextureVarName = var->Name;
-									addSamplerPair( pair );
-									//printf("◆ %s <- %s\n", pair.SamplerVarName.c_str(), pair.TextureVarName.c_str() );
-								}
-							}
-						}
-					}
-
-
-					delete[] funcBuf;
-				}
-
-
-				mDxEffect->EndPass();
-			}
-			mDxEffect->End();
-		}
-		else
-		{
-			break;
-		}
-	}
-}
-
-//---------------------------------------------------------------------
-//
-//---------------------------------------------------------------------
-const char* SamplerLinker::getTextureNameBySampler( const char* name )
-{
-	for ( SamplerPair& var : mSamplerPairArray )
-	{
-		if ( var.SamplerVarName == name ) {
-			return var.TextureVarName.c_str();
-		}
-	}
-	return NULL;
-}
-
-//---------------------------------------------------------------------
-//
-//---------------------------------------------------------------------
-SamplerLinker::TextureVar* SamplerLinker::findTextureVar( IDirect3DBaseTexture9* texture )
-{
-	for ( TextureVar& var : mTextureVarArray )
-	{
-		if ( var.Texture == texture ) {
-			return &var;
-		}
-	}
-	return NULL;
-}
-
-//---------------------------------------------------------------------
-//
-//---------------------------------------------------------------------
-void SamplerLinker::addSamplerPair( const SamplerPair& var )
-{
-	SamplerPairArray::iterator itr = std::find( mSamplerPairArray.begin(), mSamplerPairArray.end(), var );
-	if ( itr == mSamplerPairArray.end() )
-	{
-		printf("%s < %s\n", var.SamplerVarName.c_str(), var.TextureVarName.c_str() );
-		mSamplerPairArray.push_back( var );
-	}
+	String out = tokenList->ToStringValidCode();
+	out = out.Replace("shared", "");
+	return out;
 }
 
 

@@ -1092,7 +1092,7 @@ technique Technique_Sample
 		"Pass=ripple_normal;"
 
 
-        "RenderColorTarget0=;lllllllll"
+        "RenderColorTarget0=;"
         "RenderColorTarget1=;"
 	    "RenderDepthStencilTarget=;"
 	    "Pass=MainPath;"

@@ -1,25 +1,6 @@
 
 #pragma once
-#include <vector>
-#include <string>
-
-struct StateInfo
-{
-	String name;
-	String value;
-};
-
-struct PassInfo
-{
-	String name;
-	Array<StateInfo>	status;
-};
-
-struct TechniqueInfo
-{
-	String name;
-	Array<PassInfo>	passes;
-};
+#include "Symbols.h"
 
 
 //	サンプラ変数とテクスチャ変数の結びつけを行うクラス。
@@ -27,51 +8,54 @@ class SamplerLinker
 {
 public:
 
-	struct SamplerPair
-	{
-		std::string		SamplerVarName;
-		std::string		TextureVarName;
+	//struct SamplerPair
+	//{
+	//	std::string		SamplerVarName;
+	//	std::string		TextureVarName;
 
-		bool operator == ( const SamplerPair& val ) { return SamplerVarName == val.SamplerVarName; }
-	};
+	//	bool operator == ( const SamplerPair& val ) { return SamplerVarName == val.SamplerVarName; }
+	//};
 
-	/// テクスチャ型変数とその値
-	struct TextureVar
-	{
-		std::string				Name;
-		IDirect3DBaseTexture9*	Texture;
-	};
+	///// テクスチャ型変数とその値
+	//struct TextureVar
+	//{
+	//	std::string				Name;
+	//	IDirect3DBaseTexture9*	Texture;
+	//};
 
-	typedef std::vector<SamplerPair>	SamplerPairArray;
-	typedef std::vector<TextureVar>		TextureVarArray;
+	//typedef std::vector<SamplerPair>	SamplerPairArray;
+	//typedef std::vector<TextureVar>		TextureVarArray;
 
-	SamplerPairArray	mSamplerPairArray;	// output
+	//SamplerPairArray	mSamplerPairArray;	// output
 
 public:
 
+	SamplerLinker(Effect* effect);
 	~SamplerLinker();
 
 	void analyze( IDirect3DDevice9* device, ID3DXEffect* effect );
-	void Parse(const ln::parser::TokenListPtr& tokenList);
+	String Parse(ln::parser::TokenListPtr& tokenList);
 
-	const char* getTextureNameBySampler( const char* name );
+	String GetTextureNameBySampler(const String& name)
+	{
+		return m_samplerTextureMap[name];
+	}
 
 private:
 
 	void analyzeSampler( D3DXHANDLE handle, const char* name );
 
-	TextureVar* findTextureVar( IDirect3DBaseTexture9* texture );
+	//TextureVar* findTextureVar( IDirect3DBaseTexture9* texture );
 
-	void addSamplerPair( const SamplerPair& var );
+	//void addSamplerPair( const SamplerPair& var );
 
 private:
+	Effect*	m_effect;
+	std::map<String, String>	m_samplerTextureMap;
 
-	
+	//IDirect3DDevice9*	mDxDevice;
+	//ID3DXEffect*		mDxEffect;
+	//TextureVarArray		mTextureVarArray;
 
-	IDirect3DDevice9*	mDxDevice;
-	ID3DXEffect*		mDxEffect;
-	TextureVarArray		mTextureVarArray;
-
-	Array<TechniqueInfo>	m_techniqueInfoList;
 };
 

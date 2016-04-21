@@ -1,5 +1,48 @@
 
+#include <set>
 #include "Generator.h"
+
+void Generator::Generate(Effect* effect, const PathName& output)
+{
+	StreamWriter writer(output);
+
+	for (auto& param : effect->parameterList)
+	{
+		writer.WriteLine(param.name);
+	}
+
+	// パスごとにシェーダコードを生成する。
+	// まずは重複を排除
+	std::set<String> entryPointsVS;
+	std::set<String> entryPointsPS;
+	for (auto& tech : effect->m_techniqueInfoList)
+	{
+		for (auto& pass : tech.passes)
+		{
+			if (!pass.vertexShader.IsEmpty())
+			{
+				entryPointsVS.insert(pass.vertexShader);
+			}
+			if (!pass.pixelShader.IsEmpty())
+			{
+				entryPointsPS.insert(pass.pixelShader);
+			}
+		}
+	}
+	// 次にシェーダコードを作る
+	for (auto& e : entryPointsVS)
+	{
+		writer.WriteLine("#ifdef LN_GLSL_VERT_{0}", e);
+		writer.WriteLine(Convert(effect->convertableCode, e, EShLangVertex));
+		writer.WriteLine("#endif");
+	}
+	for (auto& e : entryPointsPS)
+	{
+		writer.WriteLine("#ifdef LN_GLSL_FLAG_{0}", e);
+		writer.WriteLine(Convert(effect->convertableCode, e, EShLangFragment));
+		writer.WriteLine("#endif");
+	}
+}
 
 StringA Generator::Convert(const StringA& input, const StringA& entryPoint, EShLanguage codeType)
 {

@@ -12,7 +12,7 @@ Loader::~Loader()
 	SAFE_RELEASE(m_dxEffect);
 }
 
-void Loader::Load(const ln::PathName& hlslFilePath)
+void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 {
 	DXDevice dxDevice;
 	dxDevice.initlaize();
@@ -66,8 +66,8 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 	ln::parser::DiagnosticsItemSet diag;
 	ln::parser::TokenListPtr tokens = lex.Tokenize(m_preprocessedHLSLCode.c_str(), &diag);
 	
-	SamplerLinker	samplerLinker;
-	samplerLinker.Parse(tokens);
+	SamplerLinker samplerLinker(effect);
+	effect->convertableCode = samplerLinker.Parse(tokens);
 
 	//--------------------------------------------------------------
 	// コンパイルして Effect 作成
@@ -99,8 +99,52 @@ void Loader::Load(const ln::PathName& hlslFilePath)
 	{
 		handle = m_dxEffect->GetParameter(NULL, idx);
 		if (!handle) break;
-		//mXMLDocument.InsertEndChild(
-		//	_createVariableElement(handle));
+
+		D3DXPARAMETER_DESC desc;
+		m_dxEffect->GetParameterDesc(handle, &desc);
+
+		ParameterInfo info;
+		info.name = desc.Name;
+		info.semantic = desc.Semantic ? desc.Semantic : "";
+		info.shared = ((desc.Flags & D3DX_PARAMETER_SHARED) != 0);
+
+		// サンプラ型の場合は、関連付けられているテクスチャ型変数名も格納
+		switch (desc.Type)
+		{
+		case D3DXPT_SAMPLER:
+		case D3DXPT_SAMPLER1D:
+		case D3DXPT_SAMPLER2D:
+		case D3DXPT_SAMPLER3D:
+		case D3DXPT_SAMPLERCUBE:
+		{
+			String texName = samplerLinker.GetTextureNameBySampler(desc.Name);
+			if (!texName.IsEmpty())
+			{
+				info.samplerName = info.name;
+				info.name = texName;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+
+		// アノテーション
+		for (UINT i = 0; i < desc.Annotations; ++i)
+		{
+			D3DXHANDLE anno = m_dxEffect->GetAnnotation(handle, i);
+			D3DXPARAMETER_DESC desc;
+			const char* value = NULL;
+			m_dxEffect->GetParameterDesc(anno, &desc);
+			m_dxEffect->GetString(anno, &value);
+
+			AnnotationInfo annoinfo;
+			annoinfo.name = desc.Name;
+			annoinfo.value = value;
+			info.annotations.Add(annoinfo);
+		}
+
+		effect->parameterList.Add(info);
 		++idx;
 	}
 
