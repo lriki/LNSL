@@ -712,7 +712,7 @@ namespace ParameterAnnotationParser
 			LN_PARSE_RESULT(r3, TokenChar('{'));
 			LN_PARSE_RESULT(r4, Many<Range>(Parser<Range>(Parse_pass_block)));	// ネスト	TODO: できれば <Range> はやめたい
 			LN_PARSE_RESULT(r5, TokenChar('}'));
-			return input.Success(Range{ RangeType::TechniqueBlock, r1.GetMatchBegin(), r1.GetMatchBegin(), r5.GetMatchEnd(), r4.GetValue() });
+			return input.Success(Range{ RangeType::TechniqueBlock, r1.GetMatchBegin(), r3.GetMatchBegin(), r5.GetMatchEnd(), r4.GetValue() });
 		}
 
 		static ParserResult<Range> Parse_pass_block(ParserContext input)
@@ -722,7 +722,7 @@ namespace ParameterAnnotationParser
 			LN_PARSE_RESULT(r3, TokenChar('{'));
 			// この中に < > は無いはず
 			LN_PARSE_RESULT(r5, TokenChar('}'));
-			return input.Success(Range{ RangeType::PassBlock, r1.GetMatchBegin(), r1.GetMatchBegin(), r5.GetMatchEnd(), Array<Range>() });
+			return input.Success(Range{ RangeType::PassBlock, r1.GetMatchBegin(), r3.GetMatchBegin(), r5.GetMatchEnd(), Array<Range>() });
 		}
 
 		static ParserResult<Range> Parse_Block(ParserContext input)
@@ -757,20 +757,51 @@ void SamplerLinker::Parse(const ln::parser::TokenListPtr& tokenList)
 	//Console::WriteLine(tokenList->GetAt(result.GetValue().GetAt(1).end-1).ToString());
 	
 	{
-		StreamWriter w("test2.txt");
+		//StreamWriter w("test2.txt");
 
 
 		auto list = result.GetValue();
 		for (auto& r : list)
 		{
-			r.ForEach([&w, tokenList](const ParameterAnnotationParser::Range& r)
+			r.ForEach([this, /*&w, */tokenList](const ParameterAnnotationParser::Range& r)
 			{
+
+				if (r.type == ParameterAnnotationParser::RangeType::TechniqueBlock)
+				{
+					TechniqueInfo info;
+					info.name = tokenList->GetAt(r.headerBegin + 2).ToString();	// スペースを飛ばして読むと名前
+					m_techniqueInfoList.Add(info);
+					//w.WriteLine("Technique {0}", info.name);
+				}
 				if (r.type == ParameterAnnotationParser::RangeType::PassBlock)
 				{
-					w.WriteLine("--- pass ----");
-					w.WriteLine(tokenList->ToString(r.begin, r.end));
-					w.WriteLine("-------------");
+					PassInfo info;
+					info.name = tokenList->GetAt(r.headerBegin + 2).ToString();	// スペースを飛ばして読むと名前
+					m_techniqueInfoList.GetLast().passes.Add(info);
+					//w.WriteLine("  Pass {0}", info.name);
 
+					String statusText = tokenList->ToString(r.begin + 1, r.end - 1);
+					StringArray lines = statusText.Split(_T(";"), StringSplitOptions::RemoveEmptyEntries);
+					for (String line : lines)
+					{
+						StringArray tokens = line.Split(_T("="), StringSplitOptions::RemoveEmptyEntries);
+						if (tokens.GetCount() >= 2)
+						{
+							StateInfo si{ tokens[0].Trim(), tokens[1].Trim() };
+
+							if (si.name == "VertexShader" || si.name == "PixelShader")
+							{
+								parser::CppLexer lex;
+								parser::DiagnosticsItemSet diag;
+								parser::TokenListPtr valueTokens = lex.Tokenize(si.value.c_str(), &diag);	// TODO: 範囲
+								LN_THROW(!diag.HasError(), InvalidFormatException);
+								si.value = valueTokens->GetAt(4).ToString();
+							}
+
+							info.status.Add(si);
+							//w.WriteLine("    {0}={1}", si.name, si.value);
+						}
+					}
 				}
 			});
 			

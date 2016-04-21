@@ -3,6 +3,24 @@
 #include <vector>
 #include <string>
 
+struct StateInfo
+{
+	String name;
+	String value;
+};
+
+struct PassInfo
+{
+	String name;
+	Array<StateInfo>	status;
+};
+
+struct TechniqueInfo
+{
+	String name;
+	Array<PassInfo>	passes;
+};
+
 
 //	サンプラ変数とテクスチャ変数の結びつけを行うクラス。
 class SamplerLinker
@@ -53,5 +71,7 @@ private:
 	IDirect3DDevice9*	mDxDevice;
 	ID3DXEffect*		mDxEffect;
 	TextureVarArray		mTextureVarArray;
+
+	Array<TechniqueInfo>	m_techniqueInfoList;
 };
 
