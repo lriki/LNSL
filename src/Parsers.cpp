@@ -702,7 +702,7 @@ String SamplerLinker::Parse(ln::parser::TokenListPtr& tokenList)
 					info.samplerName = tokenList->GetAt(r.headerBegin - 4).ToString();	// 巻き戻して読むと名前
 
 					// サンプラステートの読み取り
-					String statusText = tokenList->ToString(r.begin + 1, r.end - 1);
+					String statusText = tokenList->ToString(r.begin + 3, r.end - 1);
 					StringArray lines = statusText.Split(_T(";"), StringSplitOptions::RemoveEmptyEntries);
 					for (String line : lines)
 					{
@@ -713,7 +713,7 @@ String SamplerLinker::Parse(ln::parser::TokenListPtr& tokenList)
 							String r = tokens[1].Trim();
 							if (l == "texture")
 							{
-								info.textureName = r;
+								info.textureName = r.Replace("<", "").Replace(">", "").Trim();
 							}
 							else
 							{
@@ -723,6 +723,10 @@ String SamplerLinker::Parse(ln::parser::TokenListPtr& tokenList)
 					}
 
 					m_effect->m_samplerInfoList.Add(info);
+
+					// 同じ名前で使われているのは良くない
+					LN_THROW(m_samplerTextureMap[info.samplerName].IsEmpty(), InvalidFormatException);
+					m_samplerTextureMap[info.samplerName] = info.textureName;
 				}
 				else if (r.type == ParameterAnnotationParser::RangeType::Annotation)
 				{

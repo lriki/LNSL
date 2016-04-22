@@ -4,6 +4,28 @@
 
 Loader::Loader()
 	: m_dxEffect(nullptr)
+	//, m_typeNameTable{
+	//	{ D3DXPT_VOID, "" },
+	//	{ D3DXPT_BOOL, "bool" },
+	//	{ D3DXPT_INT, "int" },
+	//	{ D3DXPT_FLOAT, "float" },
+	//	{ D3DXPT_STRING, "string" },
+	//	{ D3DXPT_TEXTURE, "" },
+	//	{ D3DXPT_TEXTURE1D, "" },
+	//	{ D3DXPT_TEXTURE2D, "" },
+	//	{ D3DXPT_TEXTURE3D, "" },
+	//	{ D3DXPT_TEXTURECUBE, "" },
+	//	{ D3DXPT_SAMPLER, "" },
+	//	{ D3DXPT_SAMPLER1D, "" },
+	//	{ D3DXPT_SAMPLER2D, "" },
+	//	{ D3DXPT_SAMPLER3D, "" },
+	//	{ D3DXPT_SAMPLERCUBE, "" },
+	//	{ D3DXPT_PIXELSHADER, "" },
+	//	{ D3DXPT_VERTEXSHADER, "" },
+	//	{ D3DXPT_PIXELFRAGMENT, "" },
+	//	{ D3DXPT_VERTEXFRAGMENT, "" },
+	//	{ D3DXPT_UNSUPPORTED, "" },
+	//}
 {
 }
 
@@ -122,6 +144,7 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 			{
 				info.samplerName = info.name;
 				info.name = texName;
+				info.samplerInfo = *effect->GetSamplerInfo(info.samplerName.c_str());
 			}
 			break;
 		}
@@ -133,14 +156,14 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 		for (UINT i = 0; i < desc.Annotations; ++i)
 		{
 			D3DXHANDLE anno = m_dxEffect->GetAnnotation(handle, i);
-			D3DXPARAMETER_DESC desc;
+			D3DXPARAMETER_DESC annoDesc;
 			const char* value = NULL;
-			m_dxEffect->GetParameterDesc(anno, &desc);
+			m_dxEffect->GetParameterDesc(anno, &annoDesc);
 			m_dxEffect->GetString(anno, &value);
 
 			AnnotationInfo annoinfo;
-			annoinfo.name = desc.Name;
-			annoinfo.value = value;
+			annoinfo.name = annoDesc.Name;
+			EncodeAnnotationTypeName(anno, annoDesc, &annoinfo.type, &annoinfo.value);
 			info.annotations.Add(annoinfo);
 		}
 
@@ -148,5 +171,116 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 		++idx;
 	}
 
+	//--------------------------------------------------------------
+	// テクニック
+	D3DXHANDLE tech = NULL;
+	D3DXHANDLE next = NULL;
+	do
+	{
+		m_dxEffect->FindNextValidTechnique(tech, &next);
+		tech = next;
+		if (tech != NULL)
+		{
+			D3DXTECHNIQUE_DESC techDesc;
+			m_dxEffect->GetTechniqueDesc(tech, &techDesc);
+
+			// アノテーション
+			for (UINT i = 0; i < techDesc.Annotations; ++i)
+			{
+				D3DXHANDLE anno = m_dxEffect->GetAnnotation(tech, i);
+
+				D3DXPARAMETER_DESC annoDesc;
+				const char* value = NULL;
+				m_dxEffect->GetParameterDesc(anno, &annoDesc);
+				m_dxEffect->GetString(anno, &value);
+
+				AnnotationInfo annoinfo;
+				annoinfo.name = annoDesc.Name;
+				EncodeAnnotationTypeName(anno, annoDesc, &annoinfo.type, &annoinfo.value);
+				effect->GetTechniqueInfo(techDesc.Name)->annotations.Add(annoinfo);
+			}
+
+			// パス
+			for (UINT i = 0; i < techDesc.Passes; ++i)
+			{
+				D3DXHANDLE pass = m_dxEffect->GetPass(tech, i);
+
+				D3DXPASS_DESC passDesc;
+				m_dxEffect->GetPassDesc(pass, &passDesc);
+
+				// アノテーション
+				for (UINT i = 0; i < passDesc.Annotations; ++i)
+				{
+					D3DXHANDLE anno = m_dxEffect->GetAnnotation(pass, i);
+
+					D3DXPARAMETER_DESC annoDesc;
+					const char* value = NULL;
+					m_dxEffect->GetParameterDesc(anno, &annoDesc);
+					m_dxEffect->GetString(anno, &value);
+
+					AnnotationInfo annoinfo;
+					annoinfo.name = annoDesc.Name;
+					EncodeAnnotationTypeName(anno, annoDesc, &annoinfo.type, &annoinfo.value);
+					effect->GetTechniqueInfo(techDesc.Name)->GetPassInfo(passDesc.Name)->annotations.Add(annoinfo);
+				}
+			}
+		}
+
+	} while (tech != NULL);
+
 	SAFE_RELEASE(m_dxEffect);
+}
+
+void Loader::EncodeAnnotationTypeName(D3DXHANDLE handle, D3DXPARAMETER_DESC desc, String* outType, String* outValue)
+{
+	if (desc.Type == D3DXPT_BOOL)
+	{
+		BOOL v;
+		m_dxEffect->GetBool(handle, &v);
+		*outType = "bool";
+		*outValue = v ? "true" : "false";
+		return;
+	}
+	if (desc.Type == D3DXPT_INT)
+	{
+		INT v;
+		m_dxEffect->GetInt(handle, &v);
+		*outType = "bool";
+		*outValue = String::Format("{0}", v);
+		return;
+	}
+	if (desc.Type == D3DXPT_STRING)
+	{
+		const char* v = NULL;
+		m_dxEffect->GetString(handle, &v);
+		*outType = "string";
+		*outValue = v;
+		return;
+	}
+	if (desc.Type == D3DXPT_FLOAT)
+	{
+		if (desc.Class == D3DXPC_SCALAR)
+		{
+			FLOAT v;
+			m_dxEffect->GetFloat(handle, &v);
+			*outType = "float";
+			*outValue = String::Format("{0}", v);
+			return;
+		}
+		if (desc.Class == D3DXPC_VECTOR)
+		{
+			D3DXVECTOR4 v;
+			m_dxEffect->GetVector(handle, &v);
+			*outType = String::Format("vector{0}", desc.Columns);
+			*outValue = String::Format("{0},{1},{2},{3}", v.x, v.y, v.z, v.w);
+			return;
+		}
+		if (desc.Class == D3DXPC_MATRIX_COLUMNS)
+		{
+		}
+		if (desc.Class == D3DXPC_MATRIX_ROWS)
+		{
+		}
+	}
+	LN_THROW(0, InvalidFormatException);
 }

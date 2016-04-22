@@ -6,10 +6,31 @@ void Generator::Generate(Effect* effect, const PathName& output)
 {
 	StreamWriter writer(output);
 
+	JsonWriter json(&writer);
+
+	json.WriteStartObject();
+
+	// パラメータ
+	json.WritePropertyName("parameters");
+	json.WriteStartArray();
 	for (auto& param : effect->parameterList)
 	{
-		writer.WriteLine(param.name);
+		param.Save(&json);
 	}
+	json.WriteEndArray();
+
+	// テクニック
+	json.WritePropertyName("techniques");
+	json.WriteStartArray();
+	for (auto& tech : effect->m_techniqueInfoList)
+	{
+		tech.Save(&json);
+	}
+	json.WriteEndArray();
+
+	json.WriteEndObject();
+
+	writer.WriteLine();
 
 	// パスごとにシェーダコードを生成する。
 	// まずは重複を排除
