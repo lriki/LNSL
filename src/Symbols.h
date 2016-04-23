@@ -128,7 +128,7 @@ struct PassInfo
 		json->WriteString(pixelShader.c_str());
 		if (!status.IsEmpty())
 		{
-			json->WritePropertyName("passes");
+			json->WritePropertyName("status");
 			json->WriteStartArray();
 			for (auto& state : status)
 			{

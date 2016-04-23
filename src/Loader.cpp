@@ -245,7 +245,7 @@ void Loader::EncodeAnnotationTypeName(D3DXHANDLE handle, D3DXPARAMETER_DESC desc
 	{
 		INT v;
 		m_dxEffect->GetInt(handle, &v);
-		*outType = "bool";
+		*outType = "int";
 		*outValue = String::Format("{0}", v);
 		return;
 	}

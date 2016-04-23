@@ -28,10 +28,10 @@ int main(int argc, char* argv[])
 
 	Loader loader;
 	//loader.Load(argv[1]);
-	loader.Load(&effect, "D:/Proj/LNSL/src/test/MirrorWater_low.fxm");
+	loader.Load(&effect, "C:/Proj/LNSL/src/test/MirrorWater_low.fxm");
 
 	Generator gen;
-	gen.Generate(&effect, "D:/Proj/LNSL/src/test/MirrorWater_low.fxc");
+	gen.Generate(&effect, "C:/Proj/LNSL/src/test/MirrorWater_low.fxc");
 
 	//StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
 
