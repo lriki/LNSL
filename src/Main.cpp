@@ -24,6 +24,7 @@ http://msdn.microsoft.com/ja-jp/library/bb509615%28v=vs.85%29.aspx
 
 int main(int argc, char* argv[])
 {
+#if 0
 	Effect effect;
 
 	Loader loader;
@@ -34,6 +35,17 @@ int main(int argc, char* argv[])
 	gen.Generate(&effect, "C:/Proj/LNSL/src/test/MirrorWater_low.fxc");
 
 	//StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
+#endif
+
+	PathName src = argv[1];
+	PathName dst = src.ChangeExtension("fxc");
+
+	Effect effect;
+	Loader loader;
+	loader.Load(&effect, src);
+
+	Generator gen;
+	gen.Generate(&effect, dst);
 
 #if 0
 	std::string shaderSource;

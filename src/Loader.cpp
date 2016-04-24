@@ -76,7 +76,12 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 		LN_THROW(0, ln::InvalidFormatException);
 	}
 
-	m_preprocessedHLSLCode = StringA((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
+	// D3DXPreprocessShaderFromFile が出力するバッファは末尾に \0 がつくので、GetBufferSize() で文字列確保すると終端に \0 が複数で着てしまう
+	m_preprocessedHLSLCode = StringA((char*)pShaderText->GetBufferPointer()/*, pShaderText->GetBufferSize()*/);
+	effect->preprocessedCode = m_preprocessedHLSLCode;
+
+	// GLSL では \\ が使えないドライバもある。D3DXPreprocessShaderFromFile が出力するコードの #line に含まれるので置換しておく
+	effect->preprocessedCode.Replace("\\", "/");
 	//ln::String input((char*)pShaderText->GetBufferPointer(), pShaderText->GetBufferSize());
 	//ln::FileSystem::WriteAllText("tmp.txt", input);
 

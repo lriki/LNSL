@@ -5,34 +5,14 @@
 void Generator::Generate(Effect* effect, const PathName& output)
 {
 	StreamWriter writer(output);
+	writer.WriteLine("#ifdef LN_FXC_METADATA");
+	writer.WriteLine();
 
 	JsonWriter json(&writer);
 
 	json.WriteStartObject();
 
-	// パラメータ
-	json.WritePropertyName("parameters");
-	json.WriteStartArray();
-	for (auto& param : effect->parameterList)
-	{
-		param.Save(&json);
-	}
-	json.WriteEndArray();
-
-	// テクニック
-	json.WritePropertyName("techniques");
-	json.WriteStartArray();
-	for (auto& tech : effect->m_techniqueInfoList)
-	{
-		tech.Save(&json);
-	}
-	json.WriteEndArray();
-
-	json.WriteEndObject();
-
-	writer.WriteLine();
-
-	// パスごとにシェーダコードを生成する。
+	// EntryPoint
 	// まずは重複を排除
 	std::set<String> entryPointsVS;
 	std::set<String> entryPointsPS;
@@ -50,6 +30,49 @@ void Generator::Generate(Effect* effect, const PathName& output)
 			}
 		}
 	}
+	// vertexShaders
+	json.WritePropertyName("vertexShaders");
+	json.WriteStartArray();
+	for (auto& entry : entryPointsVS)
+	{
+		json.WriteString(entry.c_str());
+	}
+	json.WriteEndArray();
+
+	// pixelShaders
+	json.WritePropertyName("pixelShaders");
+	json.WriteStartArray();
+	for (auto& entry : entryPointsPS)
+	{
+		json.WriteString(entry.c_str());
+	}
+	json.WriteEndArray();
+
+	// techniques
+	json.WritePropertyName("techniques");
+	json.WriteStartArray();
+	for (auto& tech : effect->m_techniqueInfoList)
+	{
+		tech.Save(&json);
+	}
+	json.WriteEndArray();
+
+	// parameters
+	json.WritePropertyName("parameters");
+	json.WriteStartArray();
+	for (auto& param : effect->parameterList)
+	{
+		param.Save(&json);
+	}
+	json.WriteEndArray();
+
+	json.WriteEndObject();
+
+	writer.WriteLine();
+	writer.WriteLine("#endif");
+
+
+	
 	// 次にシェーダコードを作る
 	for (auto& e : entryPointsVS)
 	{
@@ -63,6 +86,14 @@ void Generator::Generate(Effect* effect, const PathName& output)
 		writer.WriteLine(Convert(effect->convertableCode, e, EShLangFragment));
 		writer.WriteLine("#endif");
 	}
+
+	// オリジナルのコード
+	writer.WriteLine("#ifdef LN_HLSL_DX9");
+	writer.WriteLine(effect->preprocessedCode);
+	writer.WriteLine();
+	writer.WriteLine("#endif");
+
+	
 }
 
 StringA Generator::Convert(const StringA& input, const StringA& entryPoint, EShLanguage codeType)

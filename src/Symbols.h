@@ -198,6 +198,7 @@ public:
 	Array<ParameterInfo>	parameterList;
 	Array<SamplerInfo>		m_samplerInfoList;
 	Array<TechniqueInfo>	m_techniqueInfoList;
+	String					preprocessedCode;
 	String					convertableCode;
 
 	TechniqueInfo* GetTechniqueInfo(const char* name)
