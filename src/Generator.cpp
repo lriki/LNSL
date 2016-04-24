@@ -76,13 +76,13 @@ void Generator::Generate(Effect* effect, const PathName& output)
 	// 次にシェーダコードを作る
 	for (auto& e : entryPointsVS)
 	{
-		writer.WriteLine("#ifdef LN_GLSL_VERT_{0}", e);
+		writer.WriteLine("#ifdef LN_GLSL_VERTEX_{0}", e);
 		writer.WriteLine(Convert(effect->convertableCode, e, EShLangVertex));
 		writer.WriteLine("#endif");
 	}
 	for (auto& e : entryPointsPS)
 	{
-		writer.WriteLine("#ifdef LN_GLSL_FLAG_{0}", e);
+		writer.WriteLine("#ifdef LN_GLSL_FRAGMENT_{0}", e);
 		writer.WriteLine(Convert(effect->convertableCode, e, EShLangFragment));
 		writer.WriteLine("#endif");
 	}
