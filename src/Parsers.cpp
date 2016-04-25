@@ -702,7 +702,7 @@ String SamplerLinker::Parse(ln::parser::TokenListPtr& tokenList)
 					info.samplerName = tokenList->GetAt(r.headerBegin - 4).ToString();	// 巻き戻して読むと名前
 
 					// サンプラステートの読み取り
-					String statusText = tokenList->ToString(r.begin + 3, r.end - 1);
+					String statusText = tokenList->ToString(r.begin + 4, r.end - 1);
 					StringArray lines = statusText.Split(_T(";"), StringSplitOptions::RemoveEmptyEntries);
 					for (String line : lines)
 					{

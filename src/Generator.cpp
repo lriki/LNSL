@@ -4,6 +4,8 @@
 
 void Generator::Generate(Effect* effect, const PathName& output)
 {
+	m_effect = effect;
+
 	StreamWriter writer(output);
 	writer.WriteLine("#ifdef LN_FXC_METADATA");
 	writer.WriteLine();
@@ -62,7 +64,10 @@ void Generator::Generate(Effect* effect, const PathName& output)
 	json.WriteStartArray();
 	for (auto& param : effect->parameterList)
 	{
-		param.Save(&json);
+		if (!param.isSampler)
+		{
+			param.Save(&json);
+		}
 	}
 	json.WriteEndArray();
 
@@ -97,6 +102,23 @@ void Generator::Generate(Effect* effect, const PathName& output)
 }
 
 StringA Generator::Convert(const StringA& input, const StringA& entryPoint, EShLanguage codeType)
+{
+	StringA code = Hlsl2Glsl(input,entryPoint, codeType);
+
+	// hlsl の sampler 型変数が、glsl の sampler 型変数に変換されているが、
+	// hlsl の texture 型変数を使いたい。ここで全部置換してみる
+	for (auto& param : m_effect->parameterList)
+	{
+		if (!param.samplerName.IsEmpty())
+		{
+			code = code.Replace(param.samplerName, param.name);
+		}
+	}
+
+	return code;
+}
+
+StringA Generator::Hlsl2Glsl(const StringA& input, const StringA& entryPoint, EShLanguage codeType)
 {
 	ShHandle shParser = nullptr;
 	StringA output;
@@ -165,11 +187,11 @@ StringA Generator::Convert(const StringA& input, const StringA& entryPoint, EShL
 			//EAttrSemPrimitiveID,
 			//EAttrSemCoverage,
 		};
-		static const char* kAttribString[50] = {
-			"ln_Position", //EAttrSemPosition,
-			"ln_Position1", //EAttrSemPosition1,
-			"ln_Position2", //EAttrSemPosition2,
-			"ln_Position3", //EAttrSemPosition3,
+		static const char* kAttribString[50] = {	// TODO: このへん、使える attr かどうかチェックしたい
+			"ln_Vertex", //EAttrSemPosition,
+			"ln_Vertex1", //EAttrSemPosition1,
+			"ln_Vertex2", //EAttrSemPosition2,
+			"ln_Vertex3", //EAttrSemPosition3,
 			"ln_VPos",	//EAttrSemVPos,
 			"ln_VFace", //EAttrSemVFace,
 			"ln_Normal",	//EAttrSemNormal,
@@ -180,16 +202,16 @@ StringA Generator::Convert(const StringA& input, const StringA& entryPoint, EShL
 			"ln_Color1",	//EAttrSemColor1,
 			"ln_Color2",	//EAttrSemColor2,
 			"ln_Color3",	//EAttrSemColor3,
-			"ln_TexCoord0",	//EAttrSemTex0,
-			"ln_TexCoord1",	//EAttrSemTex1,
-			"ln_TexCoord2",	//EAttrSemTex2,
-			"ln_TexCoord3",	//EAttrSemTex3,
-			"ln_TexCoord4",	//EAttrSemTex4,
-			"ln_TexCoord5",	//EAttrSemTex5,
-			"ln_TexCoord6",	//EAttrSemTex6,
-			"ln_TexCoord7",	//EAttrSemTex7,
-			"ln_TexCoord8",	//EAttrSemTex8,
-			"ln_TexCoord9",	//EAttrSemTex9,
+			"ln_MultiTexCoord0",	//EAttrSemTex0,
+			"ln_MultiTexCoord1",	//EAttrSemTex1,
+			"ln_MultiTexCoord2",	//EAttrSemTex2,
+			"ln_MultiTexCoord3",	//EAttrSemTex3,
+			"ln_MultiTexCoord4",	//EAttrSemTex4,
+			"ln_MultiTexCoord5",	//EAttrSemTex5,
+			"ln_MultiTexCoord6",	//EAttrSemTex6,
+			"ln_MultiTexCoord7",	//EAttrSemTex7,
+			"ln_MultiTexCoord8",	//EAttrSemTex8,
+			"ln_MultiTexCoord9",	//EAttrSemTex9,
 			"ln_Tangent",	//EAttrSemTangent,
 			"ln_Tangent1",	//EAttrSemTangent1,
 			"ln_Tangent2",	//EAttrSemTangent2,

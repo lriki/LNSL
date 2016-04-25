@@ -44,9 +44,10 @@ struct ParameterInfo
 {
 	String		name;
 	String		semantic;
-	String		samplerName;	// 検索キー
-	bool		shared;
-	SamplerInfo	samplerInfo;
+	bool		shared = false;
+	bool		isSampler = false;
+	String		samplerName;	// パラメータが texture 型のとき、このパラメータ変数を参照している sampeler 変数の名前
+	SamplerInfo	samplerInfo;	// パラメータが texture 型のとき、情報がセットされている
 	Array<AnnotationInfo>	annotations;
 	/*
 		hlsl2glsl は sampler 型を出力し、texture 型は出力しない。
@@ -65,11 +66,11 @@ struct ParameterInfo
 			json->WritePropertyName("semantic");
 			json->WriteString(semantic.c_str());
 		}
-		if (!samplerName.IsEmpty())
-		{
-			json->WritePropertyName("samplerName");
-			json->WriteString(samplerName.c_str());
-		}
+		//if (!samplerName.IsEmpty())
+		//{
+		//	json->WritePropertyName("samplerName");
+		//	json->WriteString(samplerName.c_str());
+		//}
 		if (shared)
 		{
 			json->WritePropertyName("shared");
@@ -211,6 +212,13 @@ public:
 	SamplerInfo* GetSamplerInfo(const char* name)
 	{
 		SamplerInfo* s = m_samplerInfoList.Find([name](const  SamplerInfo& info) {return info.samplerName == name; });
+		LN_THROW(s != nullptr, InvalidOperationException);
+		return s;
+	}
+
+	ParameterInfo* GetParameter(const char* name)
+	{
+		ParameterInfo* s = parameterList.Find([name](const  ParameterInfo& info) {return info.name == name; });
 		LN_THROW(s != nullptr, InvalidOperationException);
 		return s;
 	}

@@ -9,7 +9,10 @@ class Generator
 public:
 	void Generate(Effect* effect, const PathName& output);
 
-	static StringA Convert(const StringA& input, const StringA& entryPoint, EShLanguage codeType);
+	StringA Convert(const StringA& input, const StringA& entryPoint, EShLanguage codeType);
+
+	static StringA Hlsl2Glsl(const StringA& input, const StringA& entryPoint, EShLanguage codeType);
 
 private:
+	Effect*	m_effect;
 };

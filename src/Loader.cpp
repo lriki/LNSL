@@ -135,7 +135,8 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 		info.semantic = desc.Semantic ? desc.Semantic : "";
 		info.shared = ((desc.Flags & D3DX_PARAMETER_SHARED) != 0);
 
-		// サンプラ型の場合は、関連付けられているテクスチャ型変数名も格納
+		// サンプラ型の場合は、関連付けられているテクスチャ型変数情報へいろいろ設定する。
+		// texture 側の annotation は使いたいので、変数情報としてはこちらをメインに使用する。
 		switch (desc.Type)
 		{
 		case D3DXPT_SAMPLER:
@@ -145,12 +146,11 @@ void Loader::Load(Effect* effect, const ln::PathName& hlslFilePath)
 		case D3DXPT_SAMPLERCUBE:
 		{
 			String texName = samplerLinker.GetTextureNameBySampler(desc.Name);
-			if (!texName.IsEmpty())
-			{
-				info.samplerName = info.name;
-				info.name = texName;
-				info.samplerInfo = *effect->GetSamplerInfo(info.samplerName.c_str());
-			}
+			LN_THROW(!texName.IsEmpty(), InvalidFormatException);
+			ParameterInfo* param = effect->GetParameter(texName.c_str());
+			param->samplerName = info.name;
+			param->samplerInfo = *effect->GetSamplerInfo(param->samplerName.c_str());
+			info.isSampler = true;
 			break;
 		}
 		default:

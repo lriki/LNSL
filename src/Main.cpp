@@ -24,21 +24,14 @@ http://msdn.microsoft.com/ja-jp/library/bb509615%28v=vs.85%29.aspx
 
 int main(int argc, char* argv[])
 {
-#if 0
-	Effect effect;
-
-	Loader loader;
-	//loader.Load(argv[1]);
-	loader.Load(&effect, "C:/Proj/LNSL/src/test/MirrorWater_low.fxm");
-
-	Generator gen;
-	gen.Generate(&effect, "C:/Proj/LNSL/src/test/MirrorWater_low.fxc");
-
-	//StringA code = Generator::Convert(loader.GetPreprocessedHLSLCode(), "VS_Standard", EShLangVertex);
-#endif
-
+#if 1
 	PathName src = argv[1];
 	PathName dst = src.ChangeExtension("fxc");
+#else
+	PathName src = "C:/Proj/Lumino/src/Scene/Resource/SSBasic2D.fx";
+	PathName dst = src.ChangeExtension("fxc");
+#endif
+
 
 	Effect effect;
 	Loader loader;
